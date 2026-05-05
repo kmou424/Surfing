@@ -7,8 +7,8 @@
 IPSET_AVAILABLE=0
 IPSET_DIR="${box_path}/ipset"
 
-CN_IPV4_URL="https://ispip.clang.cn/all_cn.zone"
-CN_IPV6_URL="https://ispip.clang.cn/all_cn_ipv6.zone"
+CN_IPV4_URL="https://ispip.clang.cn/all_cn.txt"
+CN_IPV6_URL="https://ispip.clang.cn/all_cn_ipv6.txt"
 
 check_ipset_available() {
     if command -v ipset > /dev/null 2>&1; then
