@@ -1,0 +1,191 @@
+#!/system/bin/sh
+
+# ipset module for CN IP and Custom IP bypass
+# ---------------------------------------------
+# Provides: check_ipset_available, download_cn_ip, setup_ipset, cleanup_ipset
+
+IPSET_AVAILABLE=0
+IPSET_DIR="${box_path}/ipset"
+
+CN_IPV4_URL="https://ispip.clang.cn/all_cn.zone"
+CN_IPV6_URL="https://ispip.clang.cn/all_cn_ipv6.zone"
+
+check_ipset_available() {
+    if command -v ipset > /dev/null 2>&1; then
+        IPSET_AVAILABLE=1
+        log Info "ipset 可用"
+        return 0
+    fi
+    IPSET_AVAILABLE=0
+    log Warn "ipset 不可用，ipset 绕过功能将跳过."
+    return 1
+}
+
+download_cn_ip() {
+    [ "${ipset_cn_skip}" = "disable" ] && return 0
+
+    mkdir -p "${IPSET_DIR}"
+
+    log Info "正在下载最新中国 IP 段文件..."
+
+    if command -v curl > /dev/null 2>&1; then
+        curl -fsSL --connect-timeout 10 --retry 3 \
+            "${CN_IPV4_URL}" -o "${IPSET_DIR}/cn_ipv4.zone.tmp" 2>/dev/null && \
+        mv -f "${IPSET_DIR}/cn_ipv4.zone.tmp" "${IPSET_DIR}/cn_ipv4.zone"
+        [ "${ipv6}" = "enable" ] && \
+        curl -fsSL --connect-timeout 10 --retry 3 \
+            "${CN_IPV6_URL}" -o "${IPSET_DIR}/cn_ipv6.zone.tmp" 2>/dev/null && \
+        mv -f "${IPSET_DIR}/cn_ipv6.zone.tmp" "${IPSET_DIR}/cn_ipv6.zone"
+    else
+        busybox wget -q -T 10 -t 3 -O "${IPSET_DIR}/cn_ipv4.zone.tmp" \
+            "${CN_IPV4_URL}" 2>/dev/null && \
+        mv -f "${IPSET_DIR}/cn_ipv4.zone.tmp" "${IPSET_DIR}/cn_ipv4.zone"
+        [ "${ipv6}" = "enable" ] && \
+        busybox wget -q -T 10 -t 3 -O "${IPSET_DIR}/cn_ipv6.zone.tmp" \
+            "${CN_IPV6_URL}" 2>/dev/null && \
+        mv -f "${IPSET_DIR}/cn_ipv6.zone.tmp" "${IPSET_DIR}/cn_ipv6.zone"
+    fi
+
+    if [ -f "${IPSET_DIR}/cn_ipv4.zone" ]; then
+        log Info "中国 IPv4 段文件下载完成: ${IPSET_DIR}/cn_ipv4.zone"
+    else
+        log Warn "中国 IPv4 段文件下载失败."
+    fi
+    if [ "${ipv6}" = "enable" ]; then
+        if [ -f "${IPSET_DIR}/cn_ipv6.zone" ]; then
+            log Info "中国 IPv6 段文件下载完成: ${IPSET_DIR}/cn_ipv6.zone"
+        else
+            log Warn "中国 IPv6 段文件下载失败."
+        fi
+    fi
+}
+
+setup_cnip_ipset() {
+    check_ipset_available
+    [ ${IPSET_AVAILABLE} -eq 0 ] && return 1
+
+    [ "${ipset_cn_skip}" = "disable" ] && return 0
+
+    log Info "正在创建 CN IP ipset..."
+
+    ipset destroy cnip 2>/dev/null || true
+    [ "${ipv6}" = "enable" ] && ipset destroy cnip6 2>/dev/null || true
+
+    if [ -f "${IPSET_DIR}/cn_ipv4.zone" ]; then
+        local tmp_file
+        tmp_file=$(mktemp) 2>/dev/null || return 1
+        {
+            echo "create cnip hash:net family inet hashsize 8192 maxelem 65536"
+            awk '!/^[[:space:]]*#/ && NF > 0 {printf "add cnip %s\n", $0}' "${IPSET_DIR}/cn_ipv4.zone"
+        } > "${tmp_file}"
+        if ipset restore -f "${tmp_file}" 2>/dev/null; then
+            log Info "cnip ipset 创建完成 (IPv4)."
+        else
+            log Warn "cnip ipset 创建失败."
+        fi
+        rm -f "${tmp_file}"
+    fi
+
+    if [ "${ipv6}" = "enable" ] && [ -f "${IPSET_DIR}/cn_ipv6.zone" ]; then
+        local tmp_file6
+        tmp_file6=$(mktemp) 2>/dev/null || return 1
+        {
+            echo "create cnip6 hash:net family inet6 hashsize 8192 maxelem 65536"
+            awk '!/^[[:space:]]*#/ && NF > 0 {printf "add cnip6 %s\n", $0}' "${IPSET_DIR}/cn_ipv6.zone"
+        } > "${tmp_file6}"
+        if ipset restore -f "${tmp_file6}" 2>/dev/null; then
+            log Info "cnip6 ipset 创建完成 (IPv6)."
+        else
+            log Warn "cnip6 ipset 创建失败."
+        fi
+        rm -f "${tmp_file6}"
+    fi
+
+    return 0
+}
+
+setup_custom_ipset() {
+    check_ipset_available
+    [ ${IPSET_AVAILABLE} -eq 0 ] && return 1
+
+    [ "${ipset_custom_skip}" = "disable" ] && return 0
+
+    log Info "正在创建自定义 IP ipset..."
+
+    ipset destroy customip 2>/dev/null || true
+    [ "${ipv6}" = "enable" ] && ipset destroy customip6 2>/dev/null || true
+
+    if [ -f "${IPSET_DIR}/custom_ipv4.zone" ]; then
+        local tmp_file
+        tmp_file=$(mktemp) 2>/dev/null || return 1
+        {
+            echo "create customip hash:net family inet hashsize 1024 maxelem 65536"
+            awk '!/^[[:space:]]*#/ && NF > 0 {printf "add customip %s\n", $0}' "${IPSET_DIR}/custom_ipv4.zone"
+        } > "${tmp_file}"
+        if ipset restore -f "${tmp_file}" 2>/dev/null; then
+            log Info "customip ipset 创建完成 (IPv4)."
+        else
+            log Warn "customip ipset 创建失败."
+        fi
+        rm -f "${tmp_file}"
+    fi
+
+    if [ "${ipv6}" = "enable" ] && [ -f "${IPSET_DIR}/custom_ipv6.zone" ]; then
+        local tmp_file6
+        tmp_file6=$(mktemp) 2>/dev/null || return 1
+        {
+            echo "create customip6 hash:net family inet6 hashsize 1024 maxelem 65536"
+            awk '!/^[[:space:]]*#/ && NF > 0 {printf "add customip6 %s\n", $0}' "${IPSET_DIR}/custom_ipv6.zone"
+        } > "${tmp_file6}"
+        if ipset restore -f "${tmp_file6}" 2>/dev/null; then
+            log Info "customip6 ipset 创建完成 (IPv6)."
+        else
+            log Warn "customip6 ipset 创建失败."
+        fi
+        rm -f "${tmp_file6}"
+    fi
+
+    return 0
+}
+
+setup_ipset() {
+    setup_cnip_ipset
+    setup_custom_ipset
+}
+
+cleanup_ipset() {
+    log Info "正在清理 ipset..."
+    ipset destroy cnip 2>/dev/null || true
+    [ "${ipv6}" = "enable" ] && ipset destroy cnip6 2>/dev/null || true
+    ipset destroy customip 2>/dev/null || true
+    [ "${ipv6}" = "enable" ] && ipset destroy customip6 2>/dev/null || true
+    log Info "ipset 清理完成."
+}
+
+add_ipset_bypass_rules() {
+    local cmd="$1"
+    local table="$2"
+    local chain="$3"
+
+    [ ${IPSET_AVAILABLE} -eq 0 ] && return 0
+
+    if echo "${cmd}" | grep -q "ip6tables"; then
+        if [ "${ipset_cn_skip}" = "enable" ] && ipset list cnip6 >/dev/null 2>&1; then
+            ${cmd} -t "${table}" -A "${chain}" -m set --match-set cnip6 dst -j RETURN > /dev/null 2>&1
+            log Info "CN IPv6 绕过规则已添加 (${chain})."
+        fi
+        if [ "${ipset_custom_skip}" = "enable" ] && ipset list customip6 >/dev/null 2>&1; then
+            ${cmd} -t "${table}" -A "${chain}" -m set --match-set customip6 dst -j RETURN > /dev/null 2>&1
+            log Info "自定义 IPv6 绕过规则已添加 (${chain})."
+        fi
+    else
+        if [ "${ipset_cn_skip}" = "enable" ] && ipset list cnip >/dev/null 2>&1; then
+            ${cmd} -t "${table}" -A "${chain}" -m set --match-set cnip dst -j RETURN > /dev/null 2>&1
+            log Info "CN IP 绕过规则已添加 (${chain})."
+        fi
+        if [ "${ipset_custom_skip}" = "enable" ] && ipset list customip >/dev/null 2>&1; then
+            ${cmd} -t "${table}" -A "${chain}" -m set --match-set customip dst -j RETURN > /dev/null 2>&1
+            log Info "自定义 IP 绕过规则已添加 (${chain})."
+        fi
+    fi
+}

@@ -187,6 +187,9 @@ if [ -d "$BOX_BLL_PATH" ]; then
   cp -f "$MODPATH/box_bll/clash/config.yaml" "$BOX_BLL_PATH/clash/"
   cp -f "$MODPATH/box_bll/clash/Toolbox.sh" "$BOX_BLL_PATH/clash/"
   cp -f "$MODPATH/box_bll/scripts/"* "$BOX_BLL_PATH/scripts/"
+  mkdir -p "$BOX_BLL_PATH/ipset"
+  cp -f "$MODPATH/box_bll/ipset/custom_ipv4.zone" "$BOX_BLL_PATH/ipset/"
+  cp -f "$MODPATH/box_bll/ipset/custom_ipv6.zone" "$BOX_BLL_PATH/ipset/"
   
   OLD_CONFIG="$BOX_BLL_PATH/scripts/box.config.bak"
   NEW_CONFIG="$BOX_BLL_PATH/scripts/box.config"

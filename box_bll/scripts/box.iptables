@@ -6,6 +6,7 @@ scripts=$(realpath "$0")
 scripts_dir=$(dirname "${scripts}")
 
 . "${scripts_dir}/box.config"
+. "${scripts_dir}/box.ipset"
 
 mark_id="16777216/16777216"
 table_id="2024"
@@ -111,6 +112,8 @@ start_redirect() {
 
   ${iptables} -t nat -A BOX_EXTERNAL -j LOCAL_IP_V4 > /dev/null 2>&1
   ${iptables} -t nat -A BOX_LOCAL -j LOCAL_IP_V4 > /dev/null 2>&1
+  add_ipset_bypass_rules "${iptables}" "nat" "BOX_EXTERNAL"
+  add_ipset_bypass_rules "${iptables}" "nat" "BOX_LOCAL"
 
   ${iptables} -t nat -A BOX_EXTERNAL -p tcp -i lo -j REDIRECT --to-ports "${redir_port}" > /dev/null 2>&1
 
@@ -247,6 +250,7 @@ start_tproxy() {
     ${iptables} -t mangle -N LOCAL_IP_V6 > /dev/null 2>&1
     ${iptables} -t mangle -F LOCAL_IP_V6 > /dev/null 2>&1
     ${iptables} -t mangle -A BOX_EXTERNAL -j LOCAL_IP_V6 > /dev/null 2>&1
+    add_ipset_bypass_rules "${iptables}" "mangle" "BOX_EXTERNAL"
   else
     for subnet in "${intranet[@]}" ; do
       ${iptables} -t mangle -A BOX_EXTERNAL -d "${subnet}" -j RETURN > /dev/null 2>&1
@@ -254,6 +258,7 @@ start_tproxy() {
     ${iptables} -t mangle -N LOCAL_IP_V4 > /dev/null 2>&1
     ${iptables} -t mangle -F LOCAL_IP_V4 > /dev/null 2>&1
     ${iptables} -t mangle -A BOX_EXTERNAL -j LOCAL_IP_V4 > /dev/null 2>&1
+    add_ipset_bypass_rules "${iptables}" "mangle" "BOX_EXTERNAL"
   fi
 
   ${iptables} -t mangle -A BOX_EXTERNAL -p tcp -i lo -j TPROXY --on-port "${tproxy_port}" --tproxy-mark "${mark_id}" > /dev/null 2>&1
@@ -292,11 +297,13 @@ start_tproxy() {
       ${iptables} -t mangle -A BOX_LOCAL -d "${subnet6}" -j RETURN > /dev/null 2>&1
     done
     ${iptables} -t mangle -A BOX_LOCAL -j LOCAL_IP_V6 > /dev/null 2>&1
+    add_ipset_bypass_rules "${iptables}" "mangle" "BOX_LOCAL"
   else
     for subnet in "${intranet[@]}" ; do
       ${iptables} -t mangle -A BOX_LOCAL -d "${subnet}" -j RETURN > /dev/null 2>&1
     done
     ${iptables} -t mangle -A BOX_LOCAL -j LOCAL_IP_V4 > /dev/null 2>&1
+    add_ipset_bypass_rules "${iptables}" "mangle" "BOX_LOCAL"
   fi
 
   if [ "${proxy_mode}" = "blacklist" ] ; then
@@ -529,6 +536,9 @@ case "$1" in
     done
     log Info "内网豁免列表已更新."
 
+    download_cn_ip
+    setup_ipset
+
     if [ "${proxy_method}" = "TPROXY" ] ; then
       if check_tproxy_support ; then
         log Info "使用 TPROXY: TCP+UDP"
@@ -611,6 +621,7 @@ case "$1" in
     iptables="ip6tables -w 100" && stop_tproxy >> /dev/null 2>&1
     iptables="iptables -w 100" && stop_redirect >> /dev/null 2>&1
     log Warn "清理完成"
+    cleanup_ipset
     
     enable_ipv6
     log Info "IPv6 已恢复默认启用"
@@ -622,8 +633,12 @@ case "$1" in
     iptables="iptables -w 100" && stop_tproxy >> /dev/null 2>&1
     iptables="ip6tables -w 100" && stop_tproxy >> /dev/null 2>&1
     iptables="iptables -w 100" && stop_redirect >> /dev/null 2>&1
+    cleanup_ipset
     log Warn "旧规则已清理"
     sleep 3
+    
+    download_cn_ip
+    setup_ipset
     
     if ! probe_user_group ; then
       log Error "检查Box用户组失败，请确保 ${bin_name} 核心已启动."

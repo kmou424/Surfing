@@ -1,0 +1,7 @@
+# 自定义绕过代理的 IPv6 地址段 (CIDR 格式)
+# 每行一个，以 # 开头的行为注释
+# Custom IPv6 CIDR ranges to bypass proxy
+# One CIDR per line, lines starting with # are comments
+# 示例 / Examples:
+# 2001:4860:4860::8888/32
+# 2606:4700:4700::1111/32
