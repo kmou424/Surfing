@@ -10,7 +10,7 @@
         <img alt="Android" src="https://img.shields.io/badge/Module Latestsnapshot-F05033.svg?logo=android&logoColor=white">
     </a>
     <a href="https://github.com/GitMetaio/Surfing/releases">
-    <img alt="Downloads" src="https://img.shields.io/github/downloads/GitMetaio/Surfing/total?label=Module%20Download&labelColor=00b56a&logo=git&logoColor=white">
+    <img alt="Downloads" src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/GitMetaio/Surfing/main/stats.json">
 </a>
 </div>
 <br>
@@ -31,7 +31,7 @@
 
 本模块需在 Magisk/Kernelsu 环境进行使用，如果你不知道如何配置所需环境，你可能需要像 ClashForAndroid、v2rayNG、surfboard、SagerNet、AnXray 等应用程序。  
 
-[Windows 用户](https://github.com/GitMetaio/Surfing/releases/tag/Windows)
+[Windows 用户](https://github.com/GitMetaio/SurfingWin)
 
 # Surfing用户声明及免责
 
