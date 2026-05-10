@@ -4,22 +4,22 @@ isAlpha="${isAlpha:-false}"
 
 CORE_DST="box_bll/bin/clash"
 CORE_TMP="clash_core.gz"
-MIHOMO_API="https://api.github.com/repos/MetaCubeX/mihomo/releases/latest"
-MIHOMO_BASE="https://github.com/MetaCubeX/mihomo/releases/download"
+MIHOMO_REPO="MetaCubeX/mihomo"
+MIHOMO_BASE="https://github.com/${MIHOMO_REPO}/releases/download"
 MIHOMO_NAME="mihomo-android-arm64-v8"
 
-ZASH_API="https://api.github.com/repos/Zephyruso/zashboard/releases/latest"
+ZASH_REPO="Zephyruso/zashboard"
 ZASH_DST="box_bll/clash/webroot/Zash"
 ZASH_TMP="zash_dist.zip"
 
 get_latest_tag() {
-    curl -fsSL --retry 5 --retry-delay 5 \
-        -H "Authorization: token $GITHUB_TOKEN" "$1" \
-        | grep '"tag_name":' | head -n 1 \
-        | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/'
+    local repo="$1"
+    curl -sL -o /dev/null -w '%{url_effective}' \
+        "https://github.com/${repo}/releases/latest" 2>/dev/null \
+        | grep -o 'v[0-9.]*$'
 }
 
-latest_version=$(get_latest_tag "$MIHOMO_API")
+latest_version=$(get_latest_tag "$MIHOMO_REPO")
 
 if [ -z "$latest_version" ]; then
     echo "Error: Failed to fetch Mihomo version."
@@ -40,7 +40,7 @@ else
     exit 1
 fi
 
-zash_latest_version=$(get_latest_tag "$ZASH_API")
+zash_latest_version=$(get_latest_tag "$ZASH_REPO")
 if [ -n "$zash_latest_version" ]; then
     echo "Latest Zashboard version: $zash_latest_version"
     zash_url="https://github.com/Zephyruso/zashboard/releases/download/${zash_latest_version}/dist.zip"
@@ -97,6 +97,9 @@ zip -r -o -X "$filename" ./ \
     -x '.github/*' \
     -x 'folder/*' \
     -x 'build.sh' \
+    -x 'Dockerfile' \
+    -x 'Makefile' \
+    -x 'docker-entrypoint.sh' \
     -x 'stats.json' \
     -x '.stats_state' \
     -x 'Surfing.json' \
