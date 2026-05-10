@@ -267,6 +267,8 @@ start_tproxy() {
 
   ${iptables} -t mangle -A BOX_EXTERNAL -m socket -j RETURN
 
+  add_ipset_bypass_rules "${iptables}" "mangle" "BOX_EXTERNAL"
+
   if { [ "${mihomo_dns_forward}" = "true" ] && [ "${bin_name}" = "mihomo" ]; } || [ "${bin_name}" = "hysteria" ] || [ "${bin_name}" = "clash" ]; then
     ${iptables} -t mangle -A BOX_EXTERNAL -p tcp --dport 53 -j RETURN
     ${iptables} -t mangle -A BOX_EXTERNAL -p udp --dport 53 -j RETURN
@@ -282,7 +284,6 @@ start_tproxy() {
     ${iptables} -t mangle -N LOCAL_IP_V6
     ${iptables} -t mangle -F LOCAL_IP_V6
     ${iptables} -t mangle -A BOX_EXTERNAL -j LOCAL_IP_V6
-    add_ipset_bypass_rules "${iptables}" "mangle" "BOX_EXTERNAL"
   else
     for subnet in "${intranet[@]}" ; do
       ${iptables} -t mangle -A BOX_EXTERNAL -d "${subnet}" -j RETURN
@@ -290,7 +291,6 @@ start_tproxy() {
     ${iptables} -t mangle -N LOCAL_IP_V4
     ${iptables} -t mangle -F LOCAL_IP_V4
     ${iptables} -t mangle -A BOX_EXTERNAL -j LOCAL_IP_V4
-    add_ipset_bypass_rules "${iptables}" "mangle" "BOX_EXTERNAL"
   fi
 
   ${iptables} -t mangle -A BOX_EXTERNAL -p tcp -i lo -j TPROXY --on-port "${tproxy_port}" --tproxy-mark "${mark_id}"
